@@ -1,18 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 
-const API = "http://127.0.0.1:8000"; // backend
+const API = "http://127.0.0.1:8000"; // backend URL
 
 function App() {
   const [step, setStep] = useState(1);
   const [groupId] = useState("demo-group");
+
+  // Receipt & items
   const [items, setItems] = useState([]);
-  const [members, setMembers] = useState([]);
   const [newItem, setNewItem] = useState({ name: "", price: "" });
+
+  // Group members
+  const [members, setMembers] = useState([]);
   const [newMember, setNewMember] = useState("");
+
+  // Assignments & totals
+  const [assignments, setAssignments] = useState({});
   const [totals, setTotals] = useState({});
 
-  // Receipt Upload
+  // ----------------------
+  // Phase 2: Receipt
+  // ----------------------
   const addItem = () => {
     if (!newItem.name || !newItem.price) return;
     setItems([...items, { ...newItem, price: parseFloat(newItem.price) }]);
@@ -24,7 +33,9 @@ function App() {
     setStep(2);
   };
 
-  // Group Setup
+  // ----------------------
+  // Phase 2: Group
+  // ----------------------
   const addMember = () => {
     if (!newMember) return;
     setMembers([...members, newMember]);
@@ -33,27 +44,49 @@ function App() {
 
   const createGroup = async () => {
     await axios.post(`${API}/group/${groupId}`, { members });
+    // initialize totals
+    const initialTotals = members.reduce((acc, m) => ({ ...acc, [m]: 0 }), {});
+    setTotals(initialTotals);
     setStep(3);
   };
 
-// Phase 3: Assign Items
-  const assignItem = async (itemIndex, member) => {
+  // ----------------------
+  // Phase 3: Assign items
+  // ----------------------
+  const assignItem = async (itemIndex, memberName) => {
+    // send assignment to backend
     await axios.post(`${API}/assign/${groupId}`, {
       item_index: itemIndex,
-      members: [member],
+      member: memberName,
     });
-    fetchTotals();
-  };
 
-  const fetchTotals = async () => {
+    // fetch updated totals and assignments
     const res = await axios.get(`${API}/bill/${groupId}`);
     setTotals(res.data.totals);
+    setAssignments(res.data.assignments);
   };
 
+  // ----------------------
+  // JSX
+  // ----------------------
   return (
     <div style={{ padding: "20px" }}>
       <h1>Group Bill Splitter 💸</h1>
 
+      {/* Phase 1: Just testing backend */}
+      {step === 0 && (
+        <div>
+          <h2>Backend Test</h2>
+          <button onClick={async () => {
+            const res = await axios.get(API);
+            alert(res.data.message);
+          }}>
+            Test Backend
+          </button>
+        </div>
+      )}
+
+      {/* Phase 2a: Receipt */}
       {step === 1 && (
         <div>
           <h2>Step 1: Enter Receipt Items</h2>
@@ -70,17 +103,18 @@ function App() {
             onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
           />
           <button onClick={addItem}>Add Item</button>
+
           <ul>
             {items.map((it, i) => (
-              <li key={i}>
-                {it.name} - R{it.price}
-              </li>
+              <li key={i}>{it.name} - R{it.price}</li>
             ))}
           </ul>
+
           <button onClick={uploadReceipt}>Upload Receipt</button>
         </div>
       )}
 
+      {/* Phase 2b: Group members */}
       {step === 2 && (
         <div>
           <h2>Step 2: Add Group Members</h2>
@@ -91,34 +125,49 @@ function App() {
             onChange={(e) => setNewMember(e.target.value)}
           />
           <button onClick={addMember}>Add</button>
+
           <ul>
             {members.map((m, i) => (
               <li key={i}>{m}</li>
             ))}
           </ul>
+
           <button onClick={createGroup}>Create Group</button>
         </div>
       )}
 
+      {/* Phase 3: Assign items */}
       {step === 3 && (
         <div>
           <h2>Step 3: Assign Items</h2>
+
           <ul>
             {items.map((it, i) => (
               <li key={i}>
                 {it.name} - R{it.price}
                 <div>
-                  {members.map((m) => (
-                    <button key={m} onClick={() => assignItem(i, m)}>
-                      Assign to {m}
-                    </button>
-                  ))}
+                  {members.map((m) => {
+                    const assignedMember = assignments[i];
+                    const isAssigned = assignedMember === m;
+                    return (
+                      <button
+                        key={m}
+                        style={{
+                          margin: "0 5px",
+                          backgroundColor: isAssigned ? "green" : "gray",
+                          color: "white",
+                        }}
+                        onClick={() => assignItem(i, m)}
+                      >
+                        {isAssigned ? `Assigned to ${m}` : `Assign to ${m}`}
+                      </button>
+                    );
+                  })}
                 </div>
               </li>
             ))}
           </ul>
 
-          <button onClick={fetchTotals}>Refresh Totals</button>
           <h3>Totals</h3>
           <ul>
             {Object.entries(totals).map(([m, total]) => (
