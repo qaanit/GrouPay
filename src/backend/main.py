@@ -62,3 +62,34 @@ def create_group(group_id: str, group: Group):
     db["groups"][group_id]["members"] = group.members
     db["groups"][group_id]["payments"] = {m: False for m in group.members}
     return {"message": f"Group {group_id} created", "members": group.members}
+
+
+# for assigning items to each member
+@app.post("/assign/{group_id}")
+def assign_item(group_id: str, assignment: Assignment):
+    group = db["groups"].get(group_id)
+    if not group:
+        return {"error": "Group not found"}
+
+    group["assignments"].append(assignment.dict())
+
+    return {"message": "Item assigned", "assignments": group["assignments"]}
+
+
+# calculating bill
+@app.get("/bill/{group_id}")
+def get_bill(group_id: str):
+    group = db["groups"].get(group_id)
+    if not group:
+        return {"error": "Group not found"}
+
+    totals = {m: 0 for m in group["members"]}
+
+    # Calculate totals based on assignments
+    for a in group["assignments"]:
+        item = group["receipt"]["items"][a["item_index"]]
+        split_price = item["price"] / len(a["members"])
+        for m in a["members"]:
+            totals[m] += split_price
+
+    return {"totals": totals}
