@@ -1,9 +1,24 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { BrowserRouter as Router, Routes, Route, useParams } from "react-router-dom";
 
-const API = "http://127.0.0.1:8000"; // backend URL
+const API = "http://127.0.0.1:8000"; // Backend URL
 
 function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<MainApp />} />
+        <Route path="/pay/:groupId/:member" element={<MemberPayPage />} />
+      </Routes>
+    </Router>
+  );
+}
+
+// ----------------------
+// Main App (Leader View)
+// ----------------------
+function MainApp() {
   const [step, setStep] = useState(1);
   const [groupId] = useState("demo-group");
 
@@ -18,6 +33,8 @@ function App() {
   // Assignments & totals
   const [assignments, setAssignments] = useState({});
   const [totals, setTotals] = useState({});
+  const [payments, setPayments] = useState({});
+  const [allPaid, setAllPaid] = useState(false);
 
   // ----------------------
   // Phase 2: Receipt
@@ -34,7 +51,7 @@ function App() {
   };
 
   // ----------------------
-  // Phase 2: Group
+  // Phase 2: Group members
   // ----------------------
   const addMember = () => {
     if (!newMember) return;
@@ -44,7 +61,6 @@ function App() {
 
   const createGroup = async () => {
     await axios.post(`${API}/group/${groupId}`, { members });
-    // initialize totals
     const initialTotals = members.reduce((acc, m) => ({ ...acc, [m]: 0 }), {});
     setTotals(initialTotals);
     setStep(3);
@@ -54,33 +70,44 @@ function App() {
   // Phase 3: Assign items
   // ----------------------
   const assignItem = async (itemIndex, memberName) => {
-    // send assignment to backend
     await axios.post(`${API}/assign/${groupId}`, {
       item_index: itemIndex,
       member: memberName,
     });
-
-    // fetch updated totals and assignments
     const res = await axios.get(`${API}/bill/${groupId}`);
     setTotals(res.data.totals);
     setAssignments(res.data.assignments);
   };
 
   // ----------------------
-  // JSX
+  // Phase 4: Payments Dashboard
   // ----------------------
+  const fetchDashboard = async () => {
+    const res = await axios.get(`${API}/dashboard/${groupId}`);
+    setTotals(res.data.totals);
+    setAssignments(res.data.assignments);
+    setPayments(res.data.payments);
+    setAllPaid(res.data.all_paid);
+  };
+
+  useEffect(() => {
+    if (step === 4) fetchDashboard();
+  }, [step]);
+
   return (
     <div style={{ padding: "20px" }}>
       <h1>Group Bill Splitter 💸</h1>
 
-      {/* Phase 1: Just testing backend */}
+      {/* Phase 1: Backend Test */}
       {step === 0 && (
         <div>
           <h2>Backend Test</h2>
-          <button onClick={async () => {
-            const res = await axios.get(API);
-            alert(res.data.message);
-          }}>
+          <button
+            onClick={async () => {
+              const res = await axios.get(API);
+              alert(res.data.message);
+            }}
+          >
             Test Backend
           </button>
         </div>
@@ -100,13 +127,17 @@ function App() {
             type="number"
             placeholder="Price"
             value={newItem.price}
-            onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
+            onChange={(e) =>
+              setNewItem({ ...newItem, price: e.target.value })
+            }
           />
           <button onClick={addItem}>Add Item</button>
 
           <ul>
             {items.map((it, i) => (
-              <li key={i}>{it.name} - R{it.price}</li>
+              <li key={i}>
+                {it.name} - R{it.price}
+              </li>
             ))}
           </ul>
 
@@ -176,7 +207,71 @@ function App() {
               </li>
             ))}
           </ul>
+
+          <button onClick={() => setStep(4)}>Go to Payment Dashboard</button>
         </div>
+      )}
+
+      {/* Phase 4: Payment links */}
+      {step === 4 && (
+        <div>
+          <h2>Step 4: Payment Links</h2>
+          <ul>
+            {members.map((m) => (
+              <li key={m}>
+                {m}:{" "}
+                <a
+                  href={`/pay/${groupId}/${m}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open payment page
+                </a>{" "}
+                - {payments[m] ? "Paid ✅" : "Pending"}
+              </li>
+            ))}
+          </ul>
+
+          {allPaid && <h3>All payments received! You can now settle the bill 💰</h3>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ----------------------
+// Member Payment Page
+// ----------------------
+function MemberPayPage() {
+  const { groupId, member } = useParams();
+  const [paid, setPaid] = useState(false);
+  const [amount, setAmount] = useState(0);
+
+  const fetchAmount = async () => {
+    const res = await axios.get(`${API}/dashboard/${groupId}`);
+    setAmount(res.data.totals[member] || 0);
+    setPaid(res.data.payments[member]);
+  };
+
+  useEffect(() => {
+    fetchAmount();
+  }, []);
+
+  const handlePay = async () => {
+    await axios.post(`${API}/pay/${groupId}`, { member });
+    setPaid(true);
+  };
+
+  return (
+    <div style={{ padding: "20px" }}>
+      <h2>Payment Page</h2>
+      <p>
+        {member} owes: R{amount.toFixed(2)}
+      </p>
+      {paid ? (
+        <p>Paid ✅</p>
+      ) : (
+        <button onClick={handlePay}>Pay</button>
       )}
     </div>
   );

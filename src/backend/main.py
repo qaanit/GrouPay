@@ -34,6 +34,8 @@ class Assignment(BaseModel):
     item_index: int
     member: str
 
+class Payment(BaseModel):
+    member: str
 
 @app.get("/")
 def root():
@@ -103,3 +105,33 @@ def get_bill(group_id: str):
         totals[member] += item_price
 
     return {"totals": totals, "assignments": group["assignments"]}
+
+# --- Phase 4: Payments ---
+@app.post("/pay/{group_id}")
+def make_payment(group_id: str, payment: Payment):
+    group = db["groups"].get(group_id)
+    if not group:
+        return {"error": "Group not found"}
+    if payment.member not in group["members"]:
+        return {"error": "Member not in group"}
+
+    group["payments"][payment.member] = True
+    return {"message": f"{payment.member} has paid", "payments": group["payments"]}
+
+@app.get("/dashboard/{group_id}")
+def dashboard(group_id: str):
+    group = db["groups"].get(group_id)
+    if not group:
+        return {"error": "Group not found"}
+
+    all_paid = all(group["payments"].values())
+    return {
+        "assignments": group["assignments"],
+        "totals": {m: sum(
+            group["receipt"]["items"][i]["price"]
+            for i, assigned_member in group["assignments"].items()
+            if assigned_member == m
+        ) for m in group["members"]},
+        "payments": group["payments"],
+        "all_paid": all_paid
+    }
