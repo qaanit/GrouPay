@@ -1,22 +1,39 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import axios from "axios";
 
+const API = "http://127.0.0.1:8000"; // backend
 
 function App() {
-  const [msg, setMsg] = useState("");
+  const [step, setStep] = useState(1);
+  const [groupId] = useState("demo-group");
+  const [items, setItems] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [newItem, setNewItem] = useState({ name: "", price: "" });
+  const [newMember, setNewMember] = useState("");
+  const [totals, setTotals] = useState({});
 
-  useEffect(() => {
-    axios.get("http://127.0.0.1:8000/")
-      .then(res => setMsg(res.data.message))
-      .catch(err => console.error(err));
-  }, []);
+  // Receipt Upload
+  const addItem = () => {
+    if (!newItem.name || !newItem.price) return;
+    setItems([...items, { ...newItem, price: parseFloat(newItem.price) }]);
+    setNewItem({ name: "", price: "" });
+  };
 
-  return (
-    <div>
-      <h1>Frontend is running 🚀</h1>
-      <p>Backend says: {msg}</p>
-    </div>
-  );
+  const uploadReceipt = async () => {
+    await axios.post(`${API}/receipt/${groupId}`, { items });
+    setStep(2);
+  };
+
+  // Group Setup
+  const addMember = () => {
+    if (!newMember) return;
+    setMembers([...members, newMember]);
+    setNewMember("");
+  };
+
+  const createGroup = async () => {
+    await axios.post(`${API}/group/${groupId}`, { members });
+    setStep(3);
+  };
+
 }
-
-export default App;
