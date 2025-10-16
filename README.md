@@ -1,3 +1,7 @@
+# GrouPay - streamlining group payments
+This is a hackathon project, for more information on this project see demo/OVERVIEW.md
+
+
 # South African Intervarsity Hackathon Submission Template - 2025
 
 Welcome to the official Hackathon Submission Template for the **South African Intervarsity Hackathon 2025**! This repository is designed to help participants organize their project submissions in a **consistent, judge-friendly structure** while supporting any tech stack.
